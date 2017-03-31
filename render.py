@@ -35,14 +35,12 @@ for f in fonts:
                     char_list.append(hex_int)    
 
     data_array = np.empty([len(char_list), pic_size*pic_size])
-    i = 0
-    for idx in char_list:
-        textu = chr(idx)
+    for idx, char_val in enumerate(char_list):
+        textu = chr(char_val)
         im = Image.new("L", (pic_size, pic_size), 255)
         dr = ImageDraw.Draw(im)
         dr.text((0, 0), textu, font=font, fill=0)
-        data_array[i,:] = np.array(im).reshape(1, 28*28)
-        i = i + 1
+        data_array[idx,:] = np.array(im).reshape(1, 28*28)
     
     binary_file = outpath + f
     np.save(binary_file, data_array)
