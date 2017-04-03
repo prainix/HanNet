@@ -52,29 +52,51 @@ class DataSet(object):
     return self._images[start:end], self._labels[start:end]
 
 def read_data_sets():
-  # ori_array is a [6764*4, 28*28+4] array
-  ori_array = np.loadtxt("four.out")
-  np.random.shuffle(ori_array)
-  # last 4 elements of each row form the label array
-  images, labels = np.hsplit(ori_array,[ori_array.shape[1]-4])
-  validation_size = 2000
-  test_size = 5500
-  # train_images = images[test_size:]
-  # train_labels = labels[test_size:]
-  # test_images = images[:test_size]
-  # test_labels = labels[:test_size]
-  # validation_images = train_images[:validation_size]
-  # validation_labels = train_labels[:validation_size]
-  # train_images = train_images[validation_size:]
-  # train_labels = train_labels[validation_size:]
-  train_images = images[test_size:]
-  train_labels = labels[test_size:]
-  test_images = images[:test_size]
-  test_labels = labels[:test_size]
+    binarypath = "../data/binary/"
+    datasuffix = ".npy"
+    #fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
+    fonts = ["STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
 
-  train = DataSet(train_images, train_labels)
-  # validation = DataSet(validation_images,
-  #                      validation_labels)
-  test = DataSet(test_images, test_labels)
-  # return train, validation, test
-  return train, test
+    all_data = np.array([])
+    for idx, font in enumerate(fonts):
+        binary_file = binarypath + font + datasuffix
+        
+        image_data = np.load(binary_file)
+        image_data = image_data / 255.0
+        
+        label_data = np.empty([image_data.shape[0],1])
+        label_data.fill(idx)
+        
+        comb_data = np.hstack((image_data,label_data))
+        
+        if all_data.size == 0:
+            all_data = comb_data
+        else:
+            all_data = np.vstack((all_data, comb_data))
+    
+    np.random.shuffle(all_data)
+
+    # last elements of each row is the label
+    images, labels = np.hsplit(all_data, [all_data.shape[1]-1])
+
+    validation_size = 2000
+    test_size = 5500
+    # train_images = images[test_size:]
+    # train_labels = labels[test_size:]
+    # test_images = images[:test_size]
+    # test_labels = labels[:test_size]
+    # validation_images = train_images[:validation_size]
+    # validation_labels = train_labels[:validation_size]
+    # train_images = train_images[validation_size:]
+    # train_labels = train_labels[validation_size:]
+    train_images = images[test_size:]
+    train_labels = labels[test_size:]
+    test_images = images[:test_size]
+    test_labels = labels[:test_size]
+    
+    train = DataSet(train_images, train_labels)
+    # validation = DataSet(validation_images,
+    #                      validation_labels)
+    test = DataSet(test_images, test_labels)
+    # return train, validation, test
+    return train, test
