@@ -5,9 +5,9 @@ import numpy as np
 import os
 import re
 
-ttfpath = "../data/ttf/"
+ttfpath = "../../data/ttf/"
 fontsuffix = ".TTF"
-outpath = "../data/binary/"
+outpath = "../../data/binary/"
 
 fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
 #fonts = ["fangsong"]

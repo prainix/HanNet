@@ -89,7 +89,7 @@ def cnn_model_fn(features, labels, mode):
         loss=loss,
         global_step=tf.contrib.framework.get_global_step(),
         learning_rate=0.001,
-        optimizer="SGD")
+        optimizer="RMSProp")
 
   # Generate Predictions
   predictions = {
@@ -105,30 +105,56 @@ def cnn_model_fn(features, labels, mode):
 
 
 def main(unused_argv):
-  # Load training and eval data
-  [train, test] = read_data.read_data_sets()
+    
+  model_dir = "../data/HanNet_CNN"
+  if tf.gfile.Exists(model_dir):
+    tf.gfile.DeleteRecursively(model_dir)
+  tf.gfile.MakeDirs(model_dir)
+    
+  # Load training, validatoin, and eval data
+  #[train, test] = read_data.read_data_sets(False)
+  [train, validation, test] = read_data.read_data_sets(True)
+  
   train_data = train.images.astype(np.float32)  # Returns np.array
   train_labels = np.asarray(train.labels, dtype=np.int32)
   eval_data = test.images.astype(np.float32)  # Returns np.array
   eval_labels = np.asarray(test.labels, dtype=np.int32)
 
+  validation_data = validation.images.astype(np.float32)  # Returns np.array
+  validation_labels = np.asarray(validation.labels, dtype=np.int32)
+
   # Create the Estimator
   HanNet_classifier = learn.Estimator(
-      model_fn=cnn_model_fn, model_dir="../data/CNN")
+      model_fn=cnn_model_fn,
+      model_dir=model_dir,
+      config=tf.contrib.learn.RunConfig(save_checkpoints_secs=100))
 
   # Set up logging for predictions
   # Log the values in the "Softmax" tensor with label "probabilities"
-  tensors_to_log = {"probabilities": "softmax_tensor"}
-  logging_hook = tf.train.LoggingTensorHook(
-      tensors=tensors_to_log, every_n_iter=50)
+  #tensors_to_log = {"probabilities": "softmax_tensor"}
+  #logging_hook = tf.train.LoggingTensorHook(
+  #    tensors=tensors_to_log, every_n_iter=50)
 
+  # Set up validation moditor
+  validation_metrics = {
+    "accuracy":
+        tf.contrib.learn.MetricSpec(
+            metric_fn=tf.contrib.metrics.streaming_accuracy,
+            prediction_key=tf.contrib.learn.PredictionKey.CLASSES)
+  }
+  validation_monitor = tf.contrib.learn.monitors.ValidationMonitor(
+      validation_data,
+      validation_labels,
+      every_n_steps=50,
+      metrics=validation_metrics)
+  
   # Train the model
   HanNet_classifier.fit(
       x=train_data,
       y=train_labels,
       batch_size=100,
-      steps=20000,
-      monitors=[logging_hook])
+      steps=2000,
+      monitors=[validation_monitor])
 
   # Configure the accuracy metric for evaluation
   metrics = {
