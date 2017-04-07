@@ -10,8 +10,8 @@ ttfpath = "../../data/ttf/"
 fontsuffix = ".TTF"
 imgpath = "../../data/charimages/"
 
-fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
-#fonts = ["fangsong"]
+#fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
+fonts = ["STXINWEI"]
 
 pic_size = 28
 font_size = 24
@@ -30,12 +30,9 @@ for f in fonts:
     ttf = TTFont(fontpath, 0, allowVID=0, ignoreDecompileErrors=True, fontNumber=-1)
     for x in ttf["cmap"].tables:
         for y in x.cmap.items():
-            m = re.search('^uni([ABCDEF\d]+)$', y[1])
-            if m is not None:
-                hex_str = "0x"+ m.group(1)
-                hex_int = int(hex_str, 16)
-                if hex_int >= lower_bound and hex_int <= upper_bound:
-                    char_list.append(hex_int)    
+            char_int = y[0]
+            if char_int >= lower_bound and char_int <= upper_bound:
+                char_list.append(char_int)
 
     font = ImageFont.truetype(fontpath, font_size)
     for idx in char_list:

@@ -11,18 +11,17 @@ from __future__ import print_function
 
 import argparse
 import sys
-
+import tensorflow as tf
 import read_data
 
-import tensorflow as tf
-
-FLAGS = None
-NUM_FONTS = 4
+NUM_FONTS = 8
 
 def deepnn(x):
 
-  x_image = tf.reshape(x, [-1, 28, 28, 1])
-
+  with tf.name_scope('input_reshape'):
+    x_image = tf.reshape(x, [-1, 28, 28, 1])
+    tf.summary.image('input', x_image, 10)
+    
   # First convolutional layer - maps one grayscale image to 32 feature maps.
   W_conv1 = weight_variable([5, 5, 1, 32])
   b_conv1 = bias_variable([32])
@@ -89,37 +88,44 @@ def main(_):
   tf.gfile.MakeDirs(model_dir)
     
   # Load training, validatoin, and eval data
-  [train_set, test_set] = read_data.read_data_sets(False)
-  #[train, validation, test] = read_data.read_data_sets(True)
-
-  #validation_data = validation.images.astype(np.float32)  # Returns np.array
-  #validation_labels = np.asarray(validation.labels, dtype=np.int32)
+  #[train_set, test_set] = read_data.read_data_sets(False)
+  [train_set, validation_set, test_set] = read_data.read_data_sets(True)
 
   # Build the graph for the deep net
   x = tf.placeholder(tf.float32, [None, 784])
-  y_ = tf.placeholder(tf.float32, [None, NUM_FONTS])
+  y = tf.placeholder(tf.float32, [None, NUM_FONTS])
   y_conv, keep_prob = deepnn(x)
   
   # Define loss and optimizer
-  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
-  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-  correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_conv))
+  tf.summary.scalar('cross_entropy', cross_entropy)
+  
+  #train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+  train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy)
+  correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y, 1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  tf.summary.scalar('accuracy', accuracy)
+  
+  sess = tf.InteractiveSession()
 
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    for i in range(2000):
-      batch = train_set.next_batch(100)
-      if i % 100 == 0:
-        train_accuracy = accuracy.eval(feed_dict={
-            x: batch[0], y_: batch[1], keep_prob: 1.0})
-        print('step %d, training accuracy %g' % (i, train_accuracy))
-      train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.6})
+  merged = tf.summary.merge_all()
+  train_writer = tf.summary.FileWriter(model_dir + '/train', sess.graph)
+  test_writer = tf.summary.FileWriter(model_dir + '/test')
+  
+  tf.global_variables_initializer().run()
+  for i in range(2000):
+    batch = train_set.next_batch(100)
+    if i % 100 == 0:
+      train_accuracy = accuracy.eval(feed_dict={x: batch[0], y: batch[1], keep_prob: 1.0})
+      validation_accuracy = accuracy.eval(feed_dict={x: validation_set.images, y: validation_set.labels, keep_prob: 1.0})
+      print('step %d, training accuracy %g, validation accuracy %g' % (i, train_accuracy, validation_accuracy))
+    summary, _ = sess.run([merged, train_step], feed_dict={x: batch[0], y: batch[1], keep_prob: 0.6})
+    train_writer.add_summary(summary, i)
 
-    print('test accuracy %g' % accuracy.eval(feed_dict={
-        x: test_set.images, y_: test_set.labels, keep_prob: 1.0}))
-
+  print('test accuracy %g' % accuracy.eval(feed_dict={x: test_set.images, y: test_set.labels, keep_prob: 1.0}))
+  
+  model_file = model_dir + "/meta_data/HanNet.meta"
+  meta_graph_def = tf.train.export_meta_graph(filename=model_file)
+  
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  FLAGS, unparsed = parser.parse_known_args()
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run()

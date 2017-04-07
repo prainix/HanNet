@@ -52,11 +52,12 @@ class DataSet(object):
     return self._images[start:end], self._labels[start:end]
 
 def read_data_sets(with_validation):
-    binarypath = "../data/binary/"
+    binarypath = "../data/binary/24pt_base/"
     datasuffix = ".npy"
     #fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
-    fonts = ["STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
-
+    #fonts = ["STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
+    fonts = ["fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
+    
     all_data = np.array([])
     for idx, font in enumerate(fonts):
         binary_file = binarypath + font + datasuffix
