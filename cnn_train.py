@@ -46,7 +46,7 @@ def deepnn(x):
   h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 
   # Dropout
-  keep_prob = tf.placeholder(tf.float32)
+  keep_prob = tf.placeholder(tf.float32, name='keep_prob')
   h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
   # Map the 1024 features to font classes, one for each digit
@@ -83,6 +83,8 @@ def bias_variable(shape):
 def main(_):
 
   model_dir = "../data/HanNet_CNN"
+  saver_name = model_dir + "/HanNet"
+    
   if tf.gfile.Exists(model_dir):
     tf.gfile.DeleteRecursively(model_dir)
   tf.gfile.MakeDirs(model_dir)
@@ -92,8 +94,8 @@ def main(_):
   [train_set, validation_set, test_set] = read_data.read_data_sets(True)
 
   # Build the graph for the deep net
-  x = tf.placeholder(tf.float32, [None, 784])
-  y = tf.placeholder(tf.float32, [None, NUM_FONTS])
+  x = tf.placeholder(tf.float32, [None, 784], name='x-input')
+  y = tf.placeholder(tf.float32, [None, NUM_FONTS], name='y-input')
   y_conv, keep_prob = deepnn(x)
   
   # Define loss and optimizer
@@ -103,9 +105,10 @@ def main(_):
   #train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
   train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy)
   correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y, 1))
-  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
   tf.summary.scalar('accuracy', accuracy)
   
+  saver = tf.train.Saver()
   sess = tf.InteractiveSession()
 
   merged = tf.summary.merge_all()
@@ -124,8 +127,7 @@ def main(_):
 
   print('test accuracy %g' % accuracy.eval(feed_dict={x: test_set.images, y: test_set.labels, keep_prob: 1.0}))
   
-  model_file = model_dir + "/meta_data/HanNet.meta"
-  meta_graph_def = tf.train.export_meta_graph(filename=model_file)
+  saver.save(sess, saver_name)
   
 if __name__ == '__main__':
   tf.app.run()
