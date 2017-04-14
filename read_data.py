@@ -52,7 +52,7 @@ class DataSet(object):
     return self._images[start:end], self._labels[start:end]
 
 def read_data_sets(with_validation):
-    binarypath = "../data/binary/24pt_base/"
+    binarypath = "../data/binary/base_allsize/"
     datasuffix = ".npy"
     #fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
     #fonts = ["STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
@@ -77,11 +77,11 @@ def read_data_sets(with_validation):
     
     np.random.shuffle(all_data)
 
-    # last elements of each row is the label
+    # last num_fonts elements of each row is the label
     images, labels = np.hsplit(all_data, [all_data.shape[1]-len(fonts)])
 
     validation_size = 500
-    test_size = 5000
+    test_size = 10000
 
     train_images = images[test_size:]
     train_labels = labels[test_size:]
