@@ -9,18 +9,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
 import sys
 import tensorflow as tf
-import read_data
+import HanNet_input
+import HanNet_params as PARAMS
 
-NUM_FONTS = 8
+PIC_SIZE   = PARAMS.pic_size
+NUM_FONTS  = PARAMS.num_fonts
+MODEL_DIR  = PARAMS.model_dir
+BATCH_SIZE = PARAMS.batch_size
 
-def deepnn(x):
+def toy_cnn(x):
 
   with tf.name_scope('input_reshape'):
-    x_image = tf.reshape(x, [-1, 28, 28, 1])
-    tf.summary.image('input', x_image, 10)
+    x_image = tf.reshape(x, [-1, PIC_SIZE, PIC_SIZE, 1])
+    tf.summary.image('input', x_image, 100)
     
   W_conv1 = weight_variable([5, 5, 1, 32])
   b_conv1 = bias_variable([32])
@@ -48,8 +51,8 @@ def deepnn(x):
   W_fc2 = weight_variable([1024, NUM_FONTS])
   b_fc2 = bias_variable([NUM_FONTS])
 
-  y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
-  return y_conv, keep_prob
+  logits = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
+  return logits, keep_prob
 
 
 def conv2d(x, W):
@@ -76,30 +79,26 @@ def bias_variable(shape):
 
 
 def main(_):
-
-  model_dir = "../data/HanNet_CNN"
-  saver_name = model_dir + "/HanNet"
-    
-  if tf.gfile.Exists(model_dir):
-    tf.gfile.DeleteRecursively(model_dir)
-  tf.gfile.MakeDirs(model_dir)
+  if tf.gfile.Exists(MODEL_DIR):
+    tf.gfile.DeleteRecursively(MODEL_DIR)
+  tf.gfile.MakeDirs(MODEL_DIR)
     
   # Load training, validatoin, and eval data
-  #[train_set, test_set] = read_data.read_data_sets(False)
-  [train_set, validation_set, test_set] = read_data.read_data_sets(True)
+  #[train_set, test_set] = HanNet_input.read_data_sets(False)
+  [train_set, validation_set, test_set] = HanNet_input.read_data_sets(True)
 
   # Build the graph for the deep net
-  x = tf.placeholder(tf.float32, [None, 784], name='x-input')
+  x = tf.placeholder(tf.float32, [None, PIC_SIZE*PIC_SIZE], name='x-input')
   y = tf.placeholder(tf.float32, [None, NUM_FONTS], name='y-input')
-  y_conv, keep_prob = deepnn(x)
+  logits, keep_prob = toy_cnn(x)
   
   # Define loss and optimizer
-  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_conv))
+  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits))
   tf.summary.scalar('cross_entropy', cross_entropy)
   
   #train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
   train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy)
-  correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y, 1))
+  correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
   tf.summary.scalar('accuracy', accuracy)
   
@@ -107,12 +106,12 @@ def main(_):
   sess = tf.InteractiveSession()
 
   merged = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter(model_dir + '/train', sess.graph)
-  test_writer = tf.summary.FileWriter(model_dir + '/test')
+  train_writer = tf.summary.FileWriter(MODEL_DIR + '/train', sess.graph)
+  test_writer = tf.summary.FileWriter(MODEL_DIR + '/test')
   
   tf.global_variables_initializer().run()
   for i in range(2000):
-    batch = train_set.next_batch(100)
+    batch = train_set.next_batch(BATCH_SIZE)
     if i % 100 == 0:
       train_accuracy = accuracy.eval(feed_dict={x: batch[0], y: batch[1], keep_prob: 1.0})
       validation_accuracy = accuracy.eval(feed_dict={x: validation_set.images, y: validation_set.labels, keep_prob: 1.0})

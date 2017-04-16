@@ -12,23 +12,12 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 
-fonts = ["fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
-font_size = 24
+import HanNet_params as PARAMS
 
-ttfpath = "../../data/ttf/"
-fontsuffix = ".TTF"
-
-binarypath = "../data/binary/" + str(font_size) + "pt_all/"
-datasuffix = ".npy"
-
-model_dir = "../data/HanNet_CNN"
-saver_name = model_dir + "/HanNet"
-meta_file = saver_name + ".meta"
-  
 def main(_):
-    saver = tf.train.import_meta_graph(meta_file)
+    saver = tf.train.import_meta_graph(PARAMS.meta_file)
     sess = tf.InteractiveSession()
-    saver.restore(sess, saver_name)
+    saver.restore(sess, PARAMS.saver_name)
 
     g = tf.get_default_graph()
     x = g.get_tensor_by_name("x-input:0")
@@ -37,7 +26,7 @@ def main(_):
     accuracy = g.get_tensor_by_name("accuracy:0")
   
     for idx, font in enumerate(fonts):
-        binary_file = binarypath + font + datasuffix
+        binary_file = PARAMS.binarypath + font + PARAMS.datasuffix
         
         image_data = np.load(binary_file)
         image_data = image_data / 255.0
