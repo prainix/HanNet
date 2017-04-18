@@ -8,7 +8,7 @@ from bisect import bisect_left
 
 import numpy as np
 import HanNet_params as PARAMS
-import os.path
+import os
 
 def index(a, x):
     'Locate the leftmost value exactly equal to x'
@@ -121,6 +121,9 @@ def generate_binary_files(fonts):
   pic_size = PARAMS.pic_size
   font_sizes = PARAMS.font_sizes
   
+  if not os.path.isdir(PARAMS.binarypath):
+    os.makedirs(PARAMS.binarypath)
+
   baseChar_list = []
   fontpath = PARAMS.ttfpath + PARAMS.base_font + PARAMS.fontsuffix
   ttf = TTFont(fontpath, 0, allowVID=0, ignoreDecompileErrors=True, fontNumber=-1)
