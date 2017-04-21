@@ -14,9 +14,11 @@ import numpy as np
 
 import HanNet_params as PARAMS
 
+NUM_THREADS = PARAMS.num_threads
+
 def main(_):
     saver = tf.train.import_meta_graph(PARAMS.meta_file)
-    sess = tf.InteractiveSession()
+    sess = tf.InteractiveSession(config=tf.ConfigProto(intra_op_parallelism_threads=NUM_THREADS))
     saver.restore(sess, PARAMS.saver_name)
 
     g = tf.get_default_graph()
@@ -35,7 +37,7 @@ def main(_):
         label_data[:,idx].fill(1)
         
         test_accuracy = accuracy.eval(feed_dict={x: image_data, y: label_data, keep_prob: 1.0})
-        #print('Accuracy for font %s is : %g' % (font, test_accuracy))
+        print('Accuracy for font %s is : %g' % (font, test_accuracy))
         print(test_accuracy)
   
 if __name__ == '__main__':

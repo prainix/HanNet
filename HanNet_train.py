@@ -15,29 +15,20 @@ import numpy as np
 import HanNet_input
 import HanNet_params as PARAMS
 
-PIC_SIZE   = PARAMS.pic_size
-NUM_FONTS  = PARAMS.num_fonts
-MODEL_DIR  = PARAMS.model_dir
-BATCH_SIZE = PARAMS.batch_size
+MODEL_DIR   = PARAMS.model_dir
+SAVER_NAME  = PARAMS.saver_name
+NUM_FONTS   = len(PARAMS.fonts)
+PIC_SIZE    = PARAMS.pic_size
+BATCH_SIZE  = PARAMS.batch_size
 TOTAL_STEPS = PARAMS.total_steps
-NUM_THREADS = PARAMS.num_threads
+KEEP_RATIO  = 1.0 - PARAMS.drop_ratio
 
+NUM_THREADS = PARAMS.num_threads
+USE_GPU     = PARAMS.use_gpu
 
 def conv2d(x, W):
   """conv2d returns a 2d convolution layer with full stride."""
   return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-
-
-def weight_variable(shape):
-  """weight_variable generates a weight variable of a given shape."""
-  initial = tf.truncated_normal(shape, stddev=0.1)
-  return tf.Variable(initial)
-
-
-def bias_variable(shape):
-  """bias_variable generates a bias variable of a given shape."""
-  initial = tf.constant(0.1, shape=shape)
-  return tf.Variable(initial)
 
 
 def conv_layer(name, x, filter_size, in_filters, out_filters):
@@ -85,7 +76,7 @@ def fully_connected(name, x, fan_in, fan_out, useRelu=True):
 def toy_cnn(x, keep_prob):
 
   x_image = tf.reshape(x, [-1, PIC_SIZE, PIC_SIZE, 1])
-  #tf.summary.image('input', x_image, 100)
+  tf.summary.image('input', x_image, min(25, x.shape[0]))
     
   net = conv_layer('conv1', x_image, 5, 1, 32) 
 
@@ -107,7 +98,7 @@ def toy_cnn(x, keep_prob):
 def vgg_lite(x, keep_prob):
 
   x_image = tf.reshape(x, [-1, PIC_SIZE, PIC_SIZE, 1])
-  #tf.summary.image('input', x_image, 100)
+  tf.summary.image('input', x_image, min(25, x.shape[0]))
     
   net = conv_layer('conv1a', x_image, 3, 1, 32) 
   net = conv_layer('conv1b', net, 3, 32, 32) 
@@ -116,6 +107,7 @@ def vgg_lite(x, keep_prob):
 
   net = conv_layer('conv2a', net, 3, 32, 64) 
   net = conv_layer('conv2b', net, 3, 64, 64) 
+  net = conv_layer('conv2c', net, 3, 64, 64) 
 
   net = max_pool_2x2(net)
 
@@ -142,7 +134,12 @@ def main(_):
   if tf.gfile.Exists(MODEL_DIR):
     tf.gfile.DeleteRecursively(MODEL_DIR)
   tf.gfile.MakeDirs(MODEL_DIR)
-    
+
+  if USE_GPU is True:
+    dev = '/gpu:0'
+  else:
+    dev = '/cpu:0'
+
   # Load training, validatoin, and eval data
   #[train_set, test_set] = HanNet_input.read_data_sets(False)
   [train_set, validation_set, test_set] = HanNet_input.read_data_sets(True)
@@ -151,56 +148,60 @@ def main(_):
   x = tf.placeholder(tf.float32, [None, PIC_SIZE*PIC_SIZE], name='x-input')
   y = tf.placeholder(tf.float32, [None, NUM_FONTS], name='y-input')
   keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-  #logits = toy_cnn(x, keep_prob)
-  logits = vgg_lite(x, keep_prob)
-  
+
+  with tf.device(dev):
+    logits = toy_cnn(x, keep_prob)
+    #logits = vgg_lite(x, keep_prob)
+    
   # Define loss and optimizer
   cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits))
   tf.summary.scalar('cross_entropy', cross_entropy)
   
-  #train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-  train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy)
+  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+  #train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy)
   correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
   tf.summary.scalar('accuracy', accuracy)
   
-  saver = tf.train.Saver()
-  sess = tf.InteractiveSession(config=tf.ConfigProto(intra_op_parallelism_threads=NUM_THREADS))
-
   merged = tf.summary.merge_all()
   train_writer = tf.summary.FileWriter(MODEL_DIR + '/train')
   test_writer = tf.summary.FileWriter(MODEL_DIR + '/test')
   
+  saver = tf.train.Saver()
+  sess = tf.InteractiveSession(config=tf.ConfigProto(intra_op_parallelism_threads=NUM_THREADS,
+                                                     allow_soft_placement=True))
+
   tf.global_variables_initializer().run()
   for i in range(TOTAL_STEPS):
     batch = train_set.next_batch(BATCH_SIZE)
-    sess.run(train_step, feed_dict={'x-input:0': batch[0],
-                                    'y-input:0': batch[1],
-                                    'keep_prob:0': 0.6})
-
-    if not i % 10:
-      summary = sess.run(merged, feed_dict={'x-input:0': batch[0],
-                                            'y-input:0': batch[1],
-                                            'keep_prob:0': 0.6})
-      train_writer.add_summary(summary, i)
-
     if not i % 50:
-      train_accuracy = accuracy.eval(feed_dict={'x-input:0': batch[0],
-                                                'y-input:0': batch[1],
-                                                'keep_prob:0': 1.0})
+      train_loss, train_accuracy = sess.run([cross_entropy, accuracy], 
+                                            feed_dict={'x-input:0': batch[0],
+                                                       'y-input:0': batch[1],
+                                                       'keep_prob:0': 1.0})
       validation_accuracy = accuracy.eval(feed_dict={'x-input:0': validation_set.images,
                                                      'y-input:0': validation_set.labels,
                                                      'keep_prob:0': 1.0})
       print('step %d, training accuracy %g, validation accuracy %g' %
             (i, train_accuracy, validation_accuracy))
-      #print('step %d, training accuracy %g' % (i, train_accuracy))
+      #print('step %d: training loss %g, accuracy %g' % (i, train_loss, train_accuracy))
+
+    if not i % 10:
+      summary = sess.run(merged, feed_dict={'x-input:0': batch[0],
+                                            'y-input:0': batch[1],
+                                            'keep_prob:0': 1.0})
+      train_writer.add_summary(summary, i)
+
+    sess.run(train_step, feed_dict={'x-input:0': batch[0],
+                                    'y-input:0': batch[1],
+                                    'keep_prob:0': KEEP_RATIO})
 
   print('test accuracy %g' %
         accuracy.eval(feed_dict={'x-input:0': test_set.images,
                                  'y-input:0': test_set.labels,
                                  'keep_prob:0': 1.0}))
   
-  saver.save(sess, saver_name)
+  saver.save(sess, SAVER_NAME)
   
 if __name__ == '__main__':
   tf.app.run()

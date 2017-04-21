@@ -65,6 +65,7 @@ class DataSet(object):
 
 def read_data_sets(with_validation):
   fonts = PARAMS.fonts
+  num_fonts = len(PARAMS.fonts)
 
   for f in fonts:
     binary_file = PARAMS.binarypath + f + PARAMS.datasuffix
@@ -79,7 +80,7 @@ def read_data_sets(with_validation):
     image_data = np.load(binary_file)
     image_data = image_data / 255.0
     
-    label_data = np.zeros([image_data.shape[0], PARAMS.num_fonts])
+    label_data = np.zeros([image_data.shape[0], num_fonts])
     label_data[:,idx].fill(1)
     
     comb_data = np.hstack((image_data,label_data))
@@ -92,10 +93,12 @@ def read_data_sets(with_validation):
   np.random.shuffle(all_data)
 
   # last num_fonts elements of each row is the label
-  images, labels = np.hsplit(all_data, [all_data.shape[1]-PARAMS.num_fonts])
+  images, labels = np.hsplit(all_data, [all_data.shape[1]-num_fonts])
 
   validation_size = PARAMS.validation_size
-  test_size = PARAMS.test_size
+  test_size = int(all_data.shape[0] * PARAMS.test_ratio)
+  test_size = min(test_size, 2048)
+  train_size = all_data.shape[0] - test_size
 
   train_images = images[test_size:]
   train_labels = labels[test_size:]
@@ -107,11 +110,15 @@ def read_data_sets(with_validation):
     validation_labels = train_labels[:validation_size]
     train_images = train_images[validation_size:]
     train_labels = train_labels[validation_size:]
+    train_size = train_size - validation_size
   
   train = DataSet(train_images, train_labels)
   test = DataSet(test_images, test_labels)
 
+  print('Training set size: {0}'.format(train_size))
+  print('Test set size: {0}'.format(test_size))
   if(with_validation):
+    print('Validation set size: {0}'.format(validation_size))
     validation = DataSet(validation_images, validation_labels)
     return train, validation, test
   else:
@@ -145,7 +152,7 @@ def generate_binary_files(fonts):
         if (index(baseChar_list, char_int) != -1):
           char_list.append(char_int)
   
-    data_array = np.empty([len(char_list)*len(font_sizes), pic_size*pic_size])
+    data_array = np.zeros([len(char_list)*len(font_sizes), pic_size*pic_size])
     for i, size in enumerate(font_sizes):
       font = ImageFont.truetype(fontpath, size)
       for j, char_val in enumerate(char_list):
@@ -155,7 +162,7 @@ def generate_binary_files(fonts):
         pos_x = pic_size/2 - size/2
         pos_y = pos_x
         dr.text((pos_x, pos_y), textu, font=font, fill=0)
-        data_array[i*len(font_sizes)+j,:] = np.array(im).reshape(1, pic_size*pic_size)
+        data_array[i*len(char_list)+j,:] = np.array(im).reshape(1, pic_size*pic_size)
     
     out_name = PARAMS.binarypath + f 
     np.save(out_name, data_array)

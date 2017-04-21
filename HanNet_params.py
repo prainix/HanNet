@@ -42,22 +42,25 @@ elif platform_name.lower() == "windows":
   saver_name = model_dir + "HanNet"
   meta_file = saver_name + ".meta"
 
-
 # Fonts selection
 lower_bound = 0x4E00
 upper_bound = 0x9FA5
 base_font = "STHUPO"
+#fonts = ["Fangsong", "STXINGKA"]
 fonts = ["Fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
-num_fonts = 8
 
 # Data size
 pic_size = 64
-font_sizes = [56, 60, 64]
+font_sizes = [32, 38, 44, 52, 60, 64]
 
 validation_size = 500
-test_size = 2000
+test_ratio = 0.1
 
-# Training control
-total_steps = 5000
-batch_size = 10
-num_threads = 2
+# Training Hyper parameters
+total_steps = 2000
+batch_size = 50
+drop_ratio = 0.5
+
+# Hardware
+num_threads = 4
+use_gpu = True
