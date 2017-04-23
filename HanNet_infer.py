@@ -12,9 +12,11 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 
+import HanNet_input
 import HanNet_params as PARAMS
 
 NUM_THREADS = PARAMS.num_threads
+FONTS = PARAMS.fonts
 
 def main(_):
     saver = tf.train.import_meta_graph(PARAMS.meta_file)
@@ -27,18 +29,12 @@ def main(_):
     keep_prob = g.get_tensor_by_name("keep_prob:0")
     accuracy = g.get_tensor_by_name("accuracy:0")
   
-    for idx, font in enumerate(fonts):
-        binary_file = PARAMS.binarypath + font + PARAMS.datasuffix
-        
-        image_data = np.load(binary_file)
-        image_data = image_data / 255.0
-        
-        label_data = np.zeros([image_data.shape[0], len(fonts)])
-        label_data[:,idx].fill(1)
-        
-        test_accuracy = accuracy.eval(feed_dict={x: image_data, y: label_data, keep_prob: 1.0})
-        print('Accuracy for font %s is : %g' % (font, test_accuracy))
-        print(test_accuracy)
+    [test_data, _] = HanNet_input.read_data_sets(False)
+    #size = test_data.num_examples()
+    test_accuracy = accuracy.eval(feed_dict={'x-input:0': test_data.images[1:2048],
+                                             'y-input:0': test_data.labels[1:2048],
+                                             'keep_prob:0': 1.0})
+    print(test_accuracy)
   
 if __name__ == '__main__':
     tf.app.run()
