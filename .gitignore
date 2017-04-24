@@ -92,3 +92,6 @@ ENV/
 *.pydevproject
 .project
 .settings/
+
+# Vim swp file
+\.*.swp

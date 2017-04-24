@@ -6,16 +6,16 @@ import numpy as np
 import os
 import re
 
+pic_size = 28
+
 ttfpath = "../../data/ttf/"
 fontsuffix = ".TTF"
-outpath = "../../data/binary/24pt_base/"
+outpath = "../../data/binary/base_allsize/"
 
 #fonts = ["fangsong", "Kaiti", "MicrosoftYahei", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI","STZHONGS"]
 base_font = "STHUPO"
 fonts = ["fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
-
-pic_size = 28
-font_size = 24
+font_sizes = [20, 22, 24, 26, 28]
 
 # unicode Chinese chars
 lower_bound = 0x4E00
@@ -30,7 +30,6 @@ def index(a, x):
 
 baseChar_list = []
 fontpath = ttfpath + base_font + fontsuffix
-font = ImageFont.truetype(fontpath, font_size)
 ttf = TTFont(fontpath, 0, allowVID=0, ignoreDecompileErrors=True, fontNumber=-1)
 for x in ttf["cmap"].tables:
     for y in x.cmap.items():
@@ -41,7 +40,6 @@ baseChar_list.sort()
 
 for f in fonts:
     fontpath = ttfpath + f + fontsuffix
-    font = ImageFont.truetype(fontpath, font_size)
     ttf = TTFont(fontpath, 0, allowVID=0, ignoreDecompileErrors=True, fontNumber=-1)
 
     char_list = []
@@ -51,13 +49,17 @@ for f in fonts:
             if (index(baseChar_list, char_int) != -1):
                 char_list.append(char_int)
 
-    data_array = np.empty([len(char_list), pic_size*pic_size])
-    for idx, char_val in enumerate(char_list):
-        textu = chr(char_val)
-        im = Image.new("L", (pic_size, pic_size), 255)
-        dr = ImageDraw.Draw(im)
-        dr.text((0, 0), textu, font=font, fill=0)
-        data_array[idx,:] = np.array(im).reshape(1, pic_size*pic_size)
+    data_array = np.empty([len(char_list)*len(font_sizes), pic_size*pic_size])
+    for i, size in enumerate(font_sizes):
+        font = ImageFont.truetype(fontpath, size)
+        for j, char_val in enumerate(char_list):
+            textu = chr(char_val)
+            im = Image.new("L", (pic_size, pic_size), 255)
+            dr = ImageDraw.Draw(im)
+            pos_x = pic_size/2 - font_size/2
+            pos_y = pos_x
+            dr.text((pos_x, pos_y), textu, font=font, fill=0)
+            data_array[i*len(font_sizes)+j,:] = np.array(im).reshape(1, pic_size*pic_size)
     
     binary_file = outpath + f
     np.save(binary_file, data_array)

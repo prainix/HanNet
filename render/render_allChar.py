@@ -35,7 +35,9 @@ for f in fonts:
         textu = chr(char_val)
         im = Image.new("L", (pic_size, pic_size), 255)
         dr = ImageDraw.Draw(im)
-        dr.text((0, 0), textu, font=font, fill=0)
+        pos_x = pic_size/2 - font_size/2
+        pos_y = pos_x
+        dr.text((pos_x, pos_y), textu, font=font, fill=0)
         data_array[idx,:] = np.array(im).reshape(1, pic_size*pic_size)
     
     binary_file = outpath + f
