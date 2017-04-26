@@ -10,12 +10,11 @@ import numpy as np
 import tensorflow as tf
 import HanNet_params as PARAMS
 import os
+import random
 
 FONTS = PARAMS.fonts
-FONT_SIZES = PARAMS.font_sizes
+NUM_FONTS = len(FONTS)
 PIC_SIZE = PARAMS.pic_size
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = PARAMS.base_char_count * len(FONTS) * len(FONT_SIZES)
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
 
 def index(a, x):
     'Locate the leftmost value exactly equal to x'
@@ -33,34 +32,33 @@ def _int64_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
-def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size, shuffle):
-  # Create a queue that shuffles the examples, and then
-  # read 'batch_size' images + labels from the example queue.
-  num_threads = 4
+def _generate_image_and_label_batch(read_input_list, min_queue_examples, batch_size, shuffle):
   if shuffle:
-    images, label_batch = tf.train.shuffle_batch(
-        [image, label],
+    images, label_batch = tf.train.shuffle_batch_join(
+        read_input_list,
         batch_size=batch_size,
-        num_threads=num_threads,
-        capacity=min_queue_examples + (num_threads+1)*batch_size,
+        capacity=min_queue_examples + batch_size,
         min_after_dequeue=min_queue_examples)
   else:
-    images, label_batch = tf.train.batch(
-        [image, label],
+    images, label_batch = tf.train.batch_join(
+        read_input_list,
         batch_size=batch_size,
-        num_threads=num_threads,
-        capacity=min_queue_examples + (num_threads+1)*batch_size)
-
-  # Display the training images in the visualizer.
-  tf.summary.image('images', images, min(25, images.shape[0]))
+        capacity=min_queue_examples + batch_size)
 
   return images, tf.reshape(label_batch, [batch_size])
 
 
-def generate_binary_files(fonts):
+def generate_record_files(fonts, is_eval):
   
-  if not os.path.isdir(PARAMS.recordpath):
-    os.makedirs(PARAMS.recordpath)
+  if is_eval is True:
+    recordpath = PARAMS.recordpath_eval
+    font_sizes = PARAMS.font_sizes_eval
+  else:
+    recordpath = PARAMS.recordpath_train
+    font_sizes = PARAMS.font_sizes_train
+
+  if not os.path.isdir(recordpath):
+    os.makedirs(recordpath)
 
   baseChar_list = []
   fontpath = PARAMS.ttfpath + PARAMS.base_font + PARAMS.fontsuffix
@@ -83,9 +81,9 @@ def generate_binary_files(fonts):
         if (index(baseChar_list, char_int) != -1):
           char_list.append(char_int)
   
-    filename = os.path.join(PARAMS.recordpath, f + PARAMS.recordsuffix)
+    filename = os.path.join(recordpath, f + PARAMS.recordsuffix)
     writer = tf.python_io.TFRecordWriter(filename)
-    for size in FONT_SIZES:
+    for size in font_sizes:
       font = ImageFont.truetype(fontpath, size)
       for char_val in char_list:
         textu = chr(char_val)
@@ -105,59 +103,57 @@ def generate_binary_files(fonts):
     print('Done generating data for font \"{0}\", found {1} valid base chars.'.format(f, len(char_list)))
 
 
-def read_charImages(filename_queue):
-
-  class charImagesRecord(object):
-    pass
-  result = charImagesRecord()
+def read_and_process(filename_queue, distort):
 
   reader = tf.TFRecordReader()
-  result.key, value = reader.read(filename_queue)
+  _, value = reader.read(filename_queue)
   features = tf.parse_single_example(value, features={
                                      'label': tf.FixedLenFeature([], tf.int64),
                                      'image_raw': tf.FixedLenFeature([], tf.string)})
 
   image = tf.decode_raw(features['image_raw'], tf.uint8)
-  result.uint8image = tf.reshape(image, [PIC_SIZE, PIC_SIZE, 1])
+  uint8image = tf.reshape(image, [PIC_SIZE, PIC_SIZE, 1])
 
-  result.label = features['label']
+  label = features['label']
 
-  return result
+  float_image = tf.cast(uint8image, tf.float32)
+
+  if distort is True:
+    float_image = tf.image.random_flip_left_right(float_image)
+    angle = tf.random_uniform([1], minval=-3.14/8, maxval=3.14/8, dtype=tf.float32)
+    float_image = tf.contrib.image.rotate(float_image, angle)
+
+  norm_image = float_image / 255.0
+
+  return norm_image, label
 
 
-def distorted_inputs():
-  filenames = [os.path.join(PARAMS.recordpath, f+PARAMS.recordsuffix) for f in FONTS]
+def inputs(is_eval, distort, shuffle):
+  if is_eval is True:
+    filenames = [os.path.join(PARAMS.recordpath_eval, f+PARAMS.recordsuffix) for f in FONTS]
+    epochs_limit = 1
+    examples_per_epoch = PARAMS.base_char_count*NUM_FONTS*len(PARAMS.font_sizes_eval)
+  else:
+    filenames = [os.path.join(PARAMS.recordpath_train, f+PARAMS.recordsuffix) for f in FONTS]
+    epochs_limit = PARAMS.epochs_limit
+    examples_per_epoch = PARAMS.base_char_count*NUM_FONTS*len(PARAMS.font_sizes_train)
+
+  min_queue_examples = int(examples_per_epoch*PARAMS.min_fraction_of_examples_in_queue)
+
   for f in filenames:
     if not tf.gfile.Exists(f):
-      generate_binary_files(FONTS)
+      generate_record_files(FONTS, is_eval)
       break
 
   # Create a queue that produces the filenames to read.
-  filename_queue = tf.train.string_input_producer(filenames)
+  filename_queue = tf.train.string_input_producer(filenames, num_epochs=epochs_limit)
 
   # Read examples from files in the filename queue.
-  read_input = read_charImages(filename_queue)
-  reshaped_image = tf.cast(read_input.uint8image, tf.float32)
+  read_input_list = [read_and_process(filename_queue, distort=distort)
+                     for _ in range(NUM_FONTS)]
 
-  # Randomly flip the image horizontally.
-  distorted_image = tf.image.random_flip_left_right(reshaped_image)
-
-  # Because these operations are not commutative, consider randomizing
-  # the order their operation.
-  distorted_image = tf.image.random_brightness(distorted_image, max_delta=63)
-  distorted_image = tf.image.random_contrast(distorted_image, lower=0.2, upper=1.8)
-
-  # Subtract off the mean and divide by the variance of the pixels.
-  float_image = tf.image.per_image_standardization(distorted_image)
-
-  # Ensure that the random shuffling has good mixing properties.
-  min_fraction_of_examples_in_queue = 0.4
-  min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN *
-                           min_fraction_of_examples_in_queue)
-  print ('Filling queue with %d char images before starting to train. '
-         'This will take a few minutes.' % min_queue_examples)
+  print ('Filling queue with %d char images.' % min_queue_examples)
 
   # Generate a batch of images and labels by building up a queue of examples.
-  return _generate_image_and_label_batch(float_image, read_input.label,
-                                         min_queue_examples, PARAMS.batch_size,
-                                         shuffle=True)
+  return _generate_image_and_label_batch(read_input_list, min_queue_examples,
+                                         PARAMS.batch_size, shuffle=shuffle)

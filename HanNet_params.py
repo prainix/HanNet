@@ -18,10 +18,8 @@ if platform_name.lower() == "linux":
   ttfpath = cloud_mountdir + "fonts_raw/"
   fontsuffix = ".TTF"
   
-  binarypath = project_basedir + "data/binary/"
-  datasuffix = ".npy"
-  
-  recordpath = project_basedir + "data/records/"
+  recordpath_train = project_basedir + "data/records/train"
+  recordpath_eval = project_basedir + "data/records/eval"
   recordsuffix = ".tfrecords"
 
   model_dir = project_basedir + "model/"
@@ -37,20 +35,24 @@ lower_bound = 0x4E00
 upper_bound = 0x9FA5
 base_char_count = 6763
 base_font = "STHUPO"
-#fonts = ["Fangsong", "STXINGKA"]
 fonts = ["Fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
 
 # Data size
 pic_size = 64
-font_sizes = [32, 38, 44, 52, 60, 64]
+font_sizes_train = [32, 38, 44, 52, 60, 64]
+font_sizes_eval = [31, 65]
 
 validation_size = 500
-test_ratio = 0.1
+test_size = 1000
 
 # Training Hyper parameters
-total_steps = 2000
+epochs_limit = 1
+max_steps = 10000
 batch_size = 50
 drop_ratio = 0.5
+
+# Read queue control
+min_fraction_of_examples_in_queue = 0.1
 
 # Hardware
 num_threads = 4

@@ -20,7 +20,7 @@ SAVER_NAME  = PARAMS.saver_name
 NUM_FONTS   = len(PARAMS.fonts)
 PIC_SIZE    = PARAMS.pic_size
 BATCH_SIZE  = PARAMS.batch_size
-TOTAL_STEPS = PARAMS.total_steps
+MAX_STEPS   = PARAMS.max_steps
 KEEP_RATIO  = 1.0 - PARAMS.drop_ratio
 
 NUM_THREADS = PARAMS.num_threads
@@ -141,14 +141,12 @@ def main(_):
     dev = '/cpu:0'
 
   # read data using queue
-  images, labels = HanNet_input.distorted_inputs()
+  images, labels = HanNet_input.inputs(is_eval=False, distort=True, shuffle=True)
 
-  # Build the graph for the deep net
   keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-
   with tf.device(dev):
-    logits = toy_cnn(images, keep_prob)
-    #logits = vgg_lite(images, keep_prob)
+    #logits = toy_cnn(images, keep_prob)
+    logits = vgg_lite(images, keep_prob)
     
   # Define loss and optimizer
   cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -171,21 +169,38 @@ def main(_):
                                                      allow_soft_placement=True))
 
   tf.global_variables_initializer().run()
-  for i in range(TOTAL_STEPS):
-    if not i % 50:
-      train_loss, train_accuracy = sess.run([cross_entropy_mean, accuracy], 
-                                            feed_dict={'keep_prob:0': 1.0})
-      print('step %d: training loss %g, accuracy %g' % (i, train_loss, train_accuracy))
+  tf.local_variables_initializer().run()
 
-    if not i % 10:
-      summary = sess.run(merged, feed_dict={'keep_prob:0': 1.0})
-      train_writer.add_summary(summary, i)
+  coord = tf.train.Coordinator()
+  threads = tf.train.start_queue_runners(coord=coord)
 
-    sess.run(train_step, feed_dict={'keep_prob:0': KEEP_RATIO})
+  i = 0
+  try:
+    while not coord.should_stop():
+      if not i % 50:
+        train_loss, train_accuracy = sess.run([cross_entropy_mean, accuracy], 
+                                              feed_dict={'keep_prob:0': 1.0})
+        print('step %d: training loss %g, accuracy %g' % (i, train_loss, train_accuracy))
 
-  print('test accuracy %g' % accuracy.eval(feed_dict={'keep_prob:0': 1.0}))
+      if not i % 10:
+        summary = sess.run(merged, feed_dict={'keep_prob:0': 1.0})
+        train_writer.add_summary(summary, i)
+
+      sess.run(train_step, feed_dict={'keep_prob:0': KEEP_RATIO})
+
+      i = i + 1
+      if i == MAX_STEPS:
+        break
+
+  except tf.errors.OutOfRangeError:
+    print('Done training -- epoch limit reached')
+  finally:
+    coord.request_stop()
+
+  coord.request_stop()
+  coord.join(threads)
   
   saver.save(sess, SAVER_NAME)
-  
+
 if __name__ == '__main__':
   tf.app.run()
