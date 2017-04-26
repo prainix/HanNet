@@ -140,26 +140,25 @@ def main(_):
   else:
     dev = '/cpu:0'
 
-  # Load training, validatoin, and eval data
-  #[train_set, test_set] = HanNet_input.read_data_sets(False)
-  [train_set, validation_set, test_set] = HanNet_input.read_data_sets(True)
+  # read data using queue
+  images, labels = HanNet_input.distorted_inputs()
 
   # Build the graph for the deep net
-  x = tf.placeholder(tf.float32, [None, PIC_SIZE*PIC_SIZE], name='x-input')
-  y = tf.placeholder(tf.float32, [None, NUM_FONTS], name='y-input')
   keep_prob = tf.placeholder(tf.float32, name='keep_prob')
 
   with tf.device(dev):
-    logits = toy_cnn(x, keep_prob)
-    #logits = vgg_lite(x, keep_prob)
+    logits = toy_cnn(images, keep_prob)
+    #logits = vgg_lite(images, keep_prob)
     
   # Define loss and optimizer
-  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits))
-  tf.summary.scalar('cross_entropy', cross_entropy)
+  cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                  labels=labels, logits=logits, name='cross_entropy_per_example')
+  cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
+  tf.summary.scalar('cross_entropy_mean', cross_entropy_mean)
   
-  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-  #train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy)
-  correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
+  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy_mean)
+  #train_step = tf.train.RMSPropOptimizer(0.001).minimize(cross_entropy_mean)
+  correct_prediction = tf.equal(tf.argmax(logits, 1), labels)
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
   tf.summary.scalar('accuracy', accuracy)
   
@@ -173,33 +172,18 @@ def main(_):
 
   tf.global_variables_initializer().run()
   for i in range(TOTAL_STEPS):
-    batch = train_set.next_batch(BATCH_SIZE)
     if not i % 50:
-      train_loss, train_accuracy = sess.run([cross_entropy, accuracy], 
-                                            feed_dict={'x-input:0': batch[0],
-                                                       'y-input:0': batch[1],
-                                                       'keep_prob:0': 1.0})
-      validation_accuracy = accuracy.eval(feed_dict={'x-input:0': validation_set.images,
-                                                     'y-input:0': validation_set.labels,
-                                                     'keep_prob:0': 1.0})
-      print('step %d, training accuracy %g, validation accuracy %g' %
-            (i, train_accuracy, validation_accuracy))
-      #print('step %d: training loss %g, accuracy %g' % (i, train_loss, train_accuracy))
+      train_loss, train_accuracy = sess.run([cross_entropy_mean, accuracy], 
+                                            feed_dict={'keep_prob:0': 1.0})
+      print('step %d: training loss %g, accuracy %g' % (i, train_loss, train_accuracy))
 
     if not i % 10:
-      summary = sess.run(merged, feed_dict={'x-input:0': batch[0],
-                                            'y-input:0': batch[1],
-                                            'keep_prob:0': 1.0})
+      summary = sess.run(merged, feed_dict={'keep_prob:0': 1.0})
       train_writer.add_summary(summary, i)
 
-    sess.run(train_step, feed_dict={'x-input:0': batch[0],
-                                    'y-input:0': batch[1],
-                                    'keep_prob:0': KEEP_RATIO})
+    sess.run(train_step, feed_dict={'keep_prob:0': KEEP_RATIO})
 
-  print('test accuracy %g' %
-        accuracy.eval(feed_dict={'x-input:0': test_set.images,
-                                 'y-input:0': test_set.labels,
-                                 'keep_prob:0': 1.0}))
+  print('test accuracy %g' % accuracy.eval(feed_dict={'keep_prob:0': 1.0}))
   
   saver.save(sess, SAVER_NAME)
   

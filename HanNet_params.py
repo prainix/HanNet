@@ -21,30 +21,21 @@ if platform_name.lower() == "linux":
   binarypath = project_basedir + "data/binary/"
   datasuffix = ".npy"
   
+  recordpath = project_basedir + "data/records/"
+  recordsuffix = ".tfrecords"
+
   model_dir = project_basedir + "model/"
   saver_name = model_dir + "HanNet"
   meta_file = saver_name + ".meta"
 
 elif platform_name.lower() == "windows":
+  # place holder
   username = getpass.getuser()
-  home_dir = os.environ['HOME']
-  
-  project_basedir = home_dir + "/HanNet/"
-  cloud_mountdir = home_dir + "/Cloud-HanNet-Shared/"
-  
-  ttfpath = cloud_mountdir + "fonts_raw/"
-  fontsuffix = ".TTF"
-  
-  binarypath = project_basedir + "data/binary/"
-  datasuffix = ".npy"
-  
-  model_dir = project_basedir + "model/"
-  saver_name = model_dir + "HanNet"
-  meta_file = saver_name + ".meta"
 
 # Fonts selection
 lower_bound = 0x4E00
 upper_bound = 0x9FA5
+base_char_count = 6763
 base_font = "STHUPO"
 #fonts = ["Fangsong", "STXINGKA"]
 fonts = ["Fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA", "STXINWEI"]
