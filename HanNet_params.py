@@ -40,7 +40,7 @@ fonts = ["Fangsong", "Kaiti", "SimHei", "SimSun", "STHUPO", "STLITI", "STXINGKA"
 # Data size
 pic_size = 64
 font_sizes_train = [32, 38, 44, 52, 60, 64]
-font_sizes_eval = [31, 65]
+font_sizes_eval = [64]
 
 validation_size = 500
 test_size = 1000
